@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Digital Architect</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">◆ Digital Architect</div>
+    <select id="project-select" title="Project"></select>
+    <button id="btn-new-project" class="btn">+ New project</button>
+    <button id="btn-delete-project" class="btn ghost" title="Delete project">Delete</button>
+    <div class="spacer"></div>
+    <button id="btn-settings" class="btn">⚙ Providers & Agents</button>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="pipeline" class="active">AI Pipeline</button>
+    <button data-tab="canvas">Canvas (draw manually)</button>
+    <button data-tab="docs">Docs (.md)</button>
+  </nav>
+
+  <main>
+    <div id="empty-state" class="empty hidden">
+      <h2>Start a project</h2>
+      <p>Describe your idea or paste business requirements. Agents turn it into requirements, flows, architecture and a build plan,
+        or you can draw the flows and architecture yourself on the canvas.</p>
+      <button class="btn primary" id="btn-empty-new">+ New project</button>
+    </div>
+
+    <!-- AI pipeline -->
+    <section id="tab-pipeline" class="tab">
+      <div class="card">
+        <div class="row">
+          <input id="project-name" class="title-input" placeholder="Project name">
+          <button id="btn-save-idea" class="btn">Save</button>
+        </div>
+        <label class="lbl">Idea / business requirements (input for the Business Needs Agent)</label>
+        <textarea id="project-idea" rows="6" placeholder="Describe the product, users, goals, constraints… paste meeting notes or requirement docs."></textarea>
+        <div class="row">
+          <button id="btn-run-all" class="btn primary">▶ Run remaining stages</button>
+          <span class="muted small">Or run stage by stage below, review each result, give feedback, and re-run.</span>
+        </div>
+      </div>
+      <div id="stages"></div>
+    </section>
+
+    <!-- Manual canvas -->
+    <section id="tab-canvas" class="tab hidden">
+      <div class="canvas-layout">
+        <aside class="panel">
+          <div class="panel-head">
+            <b>Diagrams</b>
+            <button id="btn-new-diagram" class="btn small">+ New</button>
+          </div>
+          <ul id="diagram-list" class="list"></ul>
+          <p class="muted small">Hand-drawn diagrams are given to the agents as your intent and included in the exported docs.</p>
+        </aside>
+
+        <div class="canvas-main">
+          <div class="toolbar" id="canvas-toolbar">
+            <span class="muted small">Add:</span>
+            <button data-shape="terminal">⬭ Start/End</button>
+            <button data-shape="process">▭ Process</button>
+            <button data-shape="decision">◇ Decision</button>
+            <button data-shape="actor">◯ Actor</button>
+            <button data-shape="service">▥ Service</button>
+            <button data-shape="database">⛁ Database</button>
+            <button data-shape="queue">▱ Queue</button>
+            <button data-shape="external">⬚ External</button>
+            <button data-shape="note">🗒 Note</button>
+            <span class="sep"></span>
+            <button id="btn-undo" title="Undo (Ctrl+Z)">↶ Undo</button>
+            <button id="btn-duplicate-sel" title="Duplicate selected shape (Ctrl+D)">⧉</button>
+            <button id="btn-delete-sel" title="Delete selected (Del)">🗑</button>
+            <button id="btn-layout" title="Auto layout">⇶ Layout</button>
+            <select id="canvas-direction" title="Direction"><option value="TD">Top → Down</option><option value="LR">Left → Right</option></select>
+            <button id="btn-zoom-in">＋</button>
+            <button id="btn-zoom-out">－</button>
+            <button id="btn-fit">Fit</button>
+            <span class="sep"></span>
+            <button id="btn-export-svg" title="Download diagram as SVG">⬇ SVG</button>
+            <button id="btn-export-png" title="Download diagram as PNG">⬇ PNG</button>
+          </div>
+          <div class="canvas-wrap">
+            <svg id="canvas" tabindex="0"></svg>
+            <div id="canvas-empty" class="canvas-hint">Create or select a diagram on the left.</div>
+          </div>
+          <div class="muted small hint-line">Click a shape to edit its label &amp; description · drag the ● handle onto another shape to connect · double-click an arrow to label it · double-click empty space to add a step · Del removes · Ctrl+D duplicates · scroll to zoom · drag background to pan</div>
+        </div>
+
+        <aside class="panel wide">
+          <div id="node-panel" class="node-panel hidden">
+            <div class="panel-head">
+              <b>Selected shape</b>
+              <button id="node-close" class="btn small ghost" title="Deselect">✕</button>
+            </div>
+            <label class="lbl">Label</label>
+            <input id="node-label">
+            <label class="lbl">Shape</label>
+            <select id="node-type">
+              <option value="terminal">Start / End</option>
+              <option value="process">Process step</option>
+              <option value="decision">Decision</option>
+              <option value="actor">Actor / User</option>
+              <option value="service">Service / Component</option>
+              <option value="database">Database</option>
+              <option value="queue">Queue / Topic</option>
+              <option value="external">External system</option>
+              <option value="note">Note</option>
+            </select>
+            <label class="lbl">Description: what happens here, who does it, data, rules, errors</label>
+            <textarea id="node-desc" rows="5" placeholder="e.g. The user enters email and password. The API validates the credentials against the Users DB; after 3 failures the account is locked for 15 minutes."></textarea>
+            <div class="row">
+              <button id="node-ai-desc" class="btn small">✨ Write with AI</button>
+              <button id="node-delete" class="btn small ghost">🗑 Delete shape</button>
+            </div>
+            <hr>
+          </div>
+          <div class="assistant">
+            <div class="panel-head">
+              <b>✨ Diagram Agent</b>
+              <span id="assist-model" class="muted small"></span>
+            </div>
+            <div id="assist-log" class="assist-log"></div>
+            <div class="chips">
+              <button class="chip" data-suggest="Create this diagram from the project requirements">From requirements</button>
+              <button class="chip" data-suggest="Add error handling and alternative paths">Add error paths</button>
+              <button class="chip" data-suggest="Find missing steps or components and add them">Fill gaps</button>
+              <button class="chip" data-suggest="Simplify and clean up this diagram without losing meaning">Simplify</button>
+              <button class="chip" data-suggest="Write a clear description for every node: what happens, who or what is responsible, data in/out, rules and error handling. Do not change the diagram structure.">📝 Describe every step</button>
+            </div>
+            <textarea id="assist-input" rows="3" placeholder="Tell the agent what to draw or change, e.g.&#10;• Create a login flow with OTP and lockout after 3 failures&#10;• Add a Redis cache between the API and the database"></textarea>
+            <div class="row">
+              <button id="btn-assist" class="btn primary">Send (Ctrl+Enter)</button>
+            </div>
+          </div>
+          <hr>
+          <label class="lbl">Name</label>
+          <input id="diagram-name">
+          <label class="lbl">Type</label>
+          <select id="diagram-kind">
+            <option value="flow">Flow</option>
+            <option value="architecture">Architecture</option>
+            <option value="other">Other</option>
+          </select>
+          <label class="lbl">Description</label>
+          <textarea id="diagram-desc" rows="4" placeholder="What this diagram shows, and any notes for the agents."></textarea>
+          <div class="row">
+            <button id="btn-review-diagram" class="btn primary">Ask Architect to review</button>
+            <button id="btn-delete-diagram" class="btn ghost">Delete</button>
+          </div>
+          <details>
+            <summary>Mermaid code (import / export)</summary>
+            <textarea id="diagram-mermaid" rows="10" spellcheck="false" class="mono"></textarea>
+            <div class="row">
+              <button id="btn-import-mermaid" class="btn small">Import into canvas</button>
+              <button id="btn-copy-mermaid" class="btn small">Copy</button>
+            </div>
+          </details>
+          <div id="diagram-review" class="md small-md"></div>
+          <span id="save-status" class="muted small"></span>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Docs -->
+    <section id="tab-docs" class="tab hidden">
+      <div class="card row">
+        <button id="btn-export" class="btn primary">💾 Save .md files to disk</button>
+        <a id="btn-zip" class="btn" href="#">⬇ Download ZIP</a>
+        <button id="btn-copy-doc" class="btn">📋 Copy this file</button>
+        <button id="btn-download-doc" class="btn">⬇ This .md</button>
+        <label class="small"><input type="checkbox" id="docs-raw"> Show raw Markdown</label>
+        <span id="export-status" class="muted small"></span>
+      </div>
+      <div class="docs-layout">
+        <ul id="docs-list" class="list panel"></ul>
+        <div id="docs-view" class="card md"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Settings -->
+  <dialog id="settings-dialog">
+    <div class="dialog-head">
+      <h2>Providers & Agents</h2>
+      <button class="btn ghost" data-close>✕</button>
+    </div>
+    <p class="muted small">Add credentials for any provider, then pick which provider and model each agent uses.
+      Keys are stored only on this machine in <code>data/settings.json</code> and are never sent back to the browser.</p>
+
+    <h3>Providers</h3>
+    <div id="provider-list"></div>
+
+    <details id="provider-form-wrap">
+      <summary class="btn">+ Add provider</summary>
+      <form id="provider-form" class="grid-form">
+        <input type="hidden" name="provider_id">
+        <label>Type <select name="type" id="pf-type"></select></label>
+        <label id="pf-preset-wrap" class="hidden">Preset <select id="pf-preset"></select></label>
+        <label>Label <input name="label" placeholder="e.g. My Claude key"></label>
+        <label>API key <input name="api_key" type="password" autocomplete="off" placeholder="sk-…"></label>
+        <label>Base URL <input name="base_url" placeholder="(default)"></label>
+        <label id="pf-version-wrap" class="hidden">API version <input name="api_version" placeholder="2024-10-21"></label>
+        <label>Default model <input name="default_model"></label>
+        <label class="full">Extra request params (JSON, optional) <textarea name="extra_params" rows="2" class="mono" placeholder='{"max_tokens": 16000}'></textarea></label>
+        <div class="row full">
+          <button type="submit" class="btn primary">Save provider</button>
+          <button type="button" id="pf-cancel" class="btn ghost">Cancel</button>
+        </div>
+      </form>
+    </details>
+
+    <h3>Agents</h3>
+    <table class="agents-table">
+      <thead><tr><th>Agent</th><th title="Deep agent: plans, delegates to specialist subagents and validates its work (LangGraph). Fast: one model call.">Mode</th><th>Provider</th><th>Model</th><th title="Anthropic models only">Effort</th><th>Max tokens</th></tr></thead>
+      <tbody id="agent-rows"></tbody>
+    </table>
+    <div class="row"><button id="btn-save-agents" class="btn primary">Save agent assignments</button></div>
+  </dialog>
+
+  <dialog id="prompt-dialog">
+    <form method="dialog" id="prompt-form">
+      <h3 id="prompt-title"></h3>
+      <div id="prompt-fields"></div>
+      <div class="row">
+        <button value="ok" class="btn primary">OK</button>
+        <button value="cancel" class="btn ghost" formnovalidate>Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script type="module" src="/static/js/main.js"></script>
+</body>
+</html>

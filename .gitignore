@@ -1,0 +1,6 @@
+# Local data: provider credentials and projects live here
+data/
+__pycache__/
+*.pyc
+.venv/
+venv/
