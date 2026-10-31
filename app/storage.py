@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .config import DATA_DIR, PROJECTS_DIR, SETTINGS_FILE
+from .config import PROJECTS_DIR, SETTINGS_FILE
 
 _lock = threading.RLock()
 MASK = "••••••••"
@@ -198,6 +198,3 @@ def delete_project(project_id: str) -> None:
         folder = _project_file(project_id).parent
         if folder.exists():
             shutil.rmtree(folder)
-
-
-DATA_DIR.mkdir(parents=True, exist_ok=True)
