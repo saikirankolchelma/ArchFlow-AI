@@ -4,6 +4,7 @@ import json
 import re
 import shutil
 import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,7 +34,15 @@ def _write_json(path: Path, data: Any) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     with tmp.open("w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-    tmp.replace(path)
+    # On Windows the swap fails while another handle (antivirus, OneDrive, a reader) has the file open.
+    for attempt in range(8):
+        try:
+            tmp.replace(path)
+            return
+        except PermissionError:
+            if attempt == 7:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
 
 # ---------------------------------------------------------------- settings
@@ -41,8 +50,9 @@ def _write_json(path: Path, data: Any) -> None:
 def _default_settings() -> dict:
     return {
         "providers": [],
-        "agents": {k: {"provider_id": "", "model": "", "effort": "", "max_tokens": 32000, "engine": "deep"}
-                   for k in AGENT_KEYS},
+        # The canvas chat agent is interactive, so it defaults to a single fast call; the pipeline agents go deep.
+        "agents": {k: {"provider_id": "", "model": "", "effort": "", "max_tokens": 32000,
+                       "engine": "direct" if k == "diagram" else "deep"} for k in AGENT_KEYS},
     }
 
 
@@ -178,7 +188,8 @@ def create_project(name: str, idea: str) -> dict:
 
 
 def get_project(project_id: str) -> dict:
-    p = _read_json(_project_file(project_id), None)
+    with _lock:  # don't read while a save is swapping the file
+        p = _read_json(_project_file(project_id), None)
     if p is None:
         raise KeyError(project_id)
     p.setdefault("stages", {})
